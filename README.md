@@ -1,3 +1,18 @@
+# StudyRadar — student project
+
+**Author:** Ilias Nurlybek · **Target level:** A · **Current stage:** Week 10 planning.
+
+A personal academic agent for finding actionable messages and obligations across Canvas, Gmail, Classroom, Telegram and Teams, with confirmed synchronization to Google Calendar. Natural-language scenarios are extensible.
+
+- [Project proposal](reports/proposal.md)
+- [Architecture and access inventory](docs/architecture.md)
+- [Evaluation plan](docs/evaluation.md)
+- [Week 10 report](reports/week-10.md)
+
+The application is not implemented yet. No live integrations or LLM calls have been verified. Existing code and tests below are instructor starter material.
+
+---
+
 # AI Agents — Final Project
 
 **CSS 4007 — Artificial Intelligence · Individual project · Your choice of topic**
