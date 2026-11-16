@@ -115,3 +115,10 @@ python3 -m unittest discover -s tests/python -v
 - https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork/list
 - https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list
+
+
+### Проверка сдачи Classroom (16 ноября)
+
+Команда `classroom-assignments --course ID` теперь также читает `studentSubmissions` с `userId=me`. `TURNED_IN` означает отправленную работу; `NEW`, `CREATED` и `RECLAIMED_BY_STUDENT` — работу, которая сейчас не отправлена. `RETURNED` означает возврат преподавателем, но не доказывает необходимость доработки. Отсутствующая, неоднозначная или неизвестная запись остаётся `unknown`. При недоступности проверки задания сохраняются в выводе с `submission_checked: false`; задолженность не выдумывается. Данные не отправляются модели.
+
+Источник семантики: https://developers.google.com/workspace/classroom/reference/rest/v1/SubmissionState

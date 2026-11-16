@@ -3,12 +3,13 @@ import json
 import os
 import re
 import socket
+import ssl
 from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit
-from urllib.request import Request, build_opener, HTTPRedirectHandler
+from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPSHandler
 from zoneinfo import ZoneInfo
 
 
@@ -28,8 +29,15 @@ def request_json(url, token, payload=None):
         data = json.dumps(payload).encode('utf-8')
         headers['Content-Type'] = 'application/json'
     request = Request(url, data=data, headers=headers)
+    context = ssl.create_default_context()
     try:
-        with build_opener(NoRedirect).open(request, timeout=30) as response:
+        import certifi
+    except ImportError:
+        pass  # Standard-library-only Canvas runs keep the system trust store.
+    else:
+        context.load_verify_locations(cafile=certifi.where())
+    try:
+        with build_opener(NoRedirect, HTTPSHandler(context=context)).open(request, timeout=30) as response:
             raw = response.read(2_000_001)
             if len(raw) > 2_000_000:
                 raise AppError('Ответ сервиса слишком большой; сузь запрос.')

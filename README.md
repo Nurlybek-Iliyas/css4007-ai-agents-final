@@ -7,7 +7,7 @@ A personal academic assistant with extensible natural-language scenarios across 
 The current Python CLI implements Canvas reading and a structured OpenAI response adapter. It is not yet the full autonomous agent. Offline tests pass. The student verified live Canvas reads and an initial model response on 9 November; a status interpretation error was then fixed and regression-tested. The student repeated the corrected live workflow successfully: it selected the two not-submitted items and did not label the graded item as a debt. Other integrations are not implemented.
 
 
-Week 12 adds SQLite snapshots/history for Canvas and optional read-only Gmail/Classroom readers. Canvas persistence has one successful live-course check. Google OAuth setup and real Google data access are not yet verified. Telegram is a teacher's channel with access method still unresolved.
+Week 12 adds SQLite snapshots/history for Canvas and optional read-only Gmail/Classroom readers. Canvas persistence has one successful live-course check. Google OAuth and real reads are verified: Gmail metadata/snippets and Classroom courses, assignments and own submission states. Gmail importance classification is not implemented yet. Telegram is a teacher's channel with access method still unresolved.
 
 - [Week 12 setup, Google authorization and limitations](docs/week-12-setup.md)
 - [Week 12 progress report](reports/week-12.md)

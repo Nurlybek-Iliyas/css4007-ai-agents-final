@@ -76,14 +76,13 @@ def main(argv):
                 emit({'source': 'classroom', 'courses': reader.courses()})
             elif args.command == 'classroom-assignments':
                 records = reader.coursework(args.course[0])
-                # Unlike Canvas, student submission status has not been fetched here.
                 for record in records:
                     if record['due_at']:
                         due = datetime.fromisoformat(record['due_at'])
                         from zoneinfo import ZoneInfo
                         record['due_local'] = due.astimezone(ZoneInfo('Asia/Almaty')).isoformat()
                 emit({'source': 'classroom', 'checked_at': datetime.now(timezone.utc).isoformat(),
-                      'assignments': records, 'note': 'Статусы сдачи не проверены. Данные не сохраняются и не передаются модели.'})
+                      'assignments': records, 'note': 'Результат проверки сдачи указан в submission_checked и coverage каждого задания. Данные не сохраняются и не передаются модели.'})
             else:
                 emit(reader.recent_mail(args.days, args.limit))
             return 0

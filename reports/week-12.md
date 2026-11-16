@@ -7,9 +7,9 @@ Student: Ilias Nurlybek.
 
 Implemented account-scoped SQLite snapshots for Canvas with `sync`, `tasks`, `changes` and `sources` commands. Successful course snapshots are atomic; failures preserve old records and last-success timestamps. Repeated syncs do not create duplicates, and derived remaining-time fields do not produce false changes. Disappearing records are marked unavailable, never automatically completed.
 
-Implemented optional read-only Google authorization using official OAuth libraries, separate Gmail/Classroom credentials, bounded Google pagination, Classroom course/work listing and Gmail metadata/snippet retrieval for a bounded date interval. Classroom submission status is explicitly unknown because that endpoint is not queried yet. Gmail messages are not yet classified by importance or converted into obligations.
+Implemented optional read-only Google authorization using official OAuth libraries, separate Gmail/Classroom credentials, bounded Google pagination, Classroom course/work listing and Gmail metadata/snippet retrieval for a bounded date interval. Classroom now queries the current student’s submissions with `userId=me`. Sent, unsent, reclaimed and returned work are distinguished; returned work is not automatically treated as debt, and unavailable or ambiguous status stays unknown. Gmail messages are not yet classified by importance or converted into obligations.
 
-Added 24 tests, bringing the application suite to 43. Restored the environment template and Python CI step that were absent from the student's manual Week 11 upload. Added ignore rules for OAuth files, local databases and environments. Documented setup and actual access limitations.
+The application suite now contains 52 passing tests, including OAuth scope compatibility, safe diagnostics, Classroom submission states, account filtering and partial failures. Restored the environment template and Python CI step that were absent from the student's manual Week 11 upload. Added ignore rules for OAuth files, local databases and environments. Documented setup and actual access limitations.
 
 ## Important Commits
 
@@ -22,7 +22,9 @@ A manual GitHub upload has its own commit hash and is not claimed to share local
 
 The synthetic CLI sync saves three assignments; a repeat produces zero new or updated records. Cache commands report source freshness and do not claim a live check. A live read of one previously authorized Canvas course succeeded on 16 November and saved three records without sending them to an LLM. Raw private course data is excluded from this report and repository.
 
-All 43 application tests pass with mocked network responses. Google OAuth dependencies were installed and imported locally; system Python 3.9 and LibreSSL generated compatibility warnings, so setup recommends a supported Python 3.11+ environment. No real Google authorization or data read has been demonstrated: the student does not yet have an OAuth Desktop client and requested setup instructions.
+All 52 application tests pass under Python 3.14.10 with mocked network responses. Real Google authorization and read-only API checks also succeeded on 16 November: Classroom listed two courses and retrieved eight assignments with current-student submission states from one selected course. Gmail read metadata/snippets for 11 messages in the preceding three days, with zero message failures and no truncation. No Google content was sent to an LLM. Private messages, course details and credentials are excluded from the repository.
+
+Two integration problems were fixed: the Python HTTPS trust store needed the certifi CA bundle (TLS verification remains enabled), and Classroom authorization may return the alternative read-only `student-submissions.me.readonly` name. Scope comparison now recognizes that name while preserving the actual returned credentials and rejecting missing or unsupported permissions. Browser callback text no longer claims authorization is complete before the token exchange finishes.
 
 Week 11's Canvas-to-model flow remains available. The new persistence and Google readers are not yet integrated into autonomous model-selected tool execution. Google reads do not yet persist in the combined obligation database. Telegram, Teams, Google Calendar writes and the daily scheduler are not implemented.
 
@@ -42,4 +44,4 @@ AI assistance: Codex assisted with implementation, tests, documentation and repo
 
 ## Next Week
 
-Before closing Week 12, complete Google Cloud setup, authorize the intended accounts and compare a small real Gmail/Classroom sample with the source interfaces. Confirm the permitted Telegram channel access method. Then add extraction of obligations from messages, integrate additional sources into storage, and begin genuine model-selected tool execution. Record any inaccessible integration and revise scope transparently.
+Google setup and initial real Gmail/Classroom reads are complete. Before closing Week 12, the student should compare the retrieved statuses and dates with the source interfaces. Confirm the permitted Telegram channel access method. Then add extraction of obligations from messages, integrate additional sources into storage, and begin genuine model-selected tool execution. Record any inaccessible integration and revise scope transparently.

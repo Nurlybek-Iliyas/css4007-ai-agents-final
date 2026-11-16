@@ -14,6 +14,55 @@ SCOPES = {
                   'https://www.googleapis.com/auth/classroom.coursework.me.readonly']}
 
 
+# Google lists both names as "View your coursework and grades".
+# Keep the actual returned scopes in credentials; normalize only comparisons.
+COURSEWORK_SCOPE = 'https://www.googleapis.com/auth/classroom.coursework.me.readonly'
+SUBMISSIONS_SCOPE = 'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly'
+
+
+def comparable_scopes(scopes):
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+    return {COURSEWORK_SCOPE if scope == SUBMISSIONS_SCOPE else scope for scope in (scopes or [])}
+
+
+def has_required_scopes(creds, required):
+    actual = creds.granted_scopes if creds.granted_scopes is not None else creds.scopes
+    return comparable_scopes(required).issubset(comparable_scopes(actual))
+
+
+def checked_scope_token(warning, required):
+    """Accept only a verified library scope-change warning with our read-only scopes."""
+    token = getattr(warning, 'token', None)
+    raw_granted = getattr(warning, 'new_scope', []) or []
+    granted = set(raw_granted.split() if isinstance(raw_granted, str) else raw_granted)
+    allowed = set().union(*SCOPES.values()) | {SUBMISSIONS_SCOPE}
+    if not isinstance(token, dict) or not token.get('access_token'):
+        raise AppError('Google OAuth: неожиданный ответ разрешений; токен не сохранён.')
+    if not comparable_scopes(required).issubset(comparable_scopes(granted)):
+        missing = ', '.join(sorted(scope.rsplit('/', 1)[-1] for scope in comparable_scopes(required) - comparable_scopes(granted)))
+        received = ', '.join(sorted(scope.rsplit('/', 1)[-1] for scope in granted & allowed)) or '(нет ожидаемых разрешений)'
+        raise AppError('Ответ Google содержит неполный набор разрешений. Не хватает: ' + missing +
+                       '. Получены: ' + received + '. Это не обязательно связано с выбором галочек; токен не сохранён.')
+    if not granted.issubset(allowed):
+        raise AppError('Google вернул дополнительные неподдерживаемые разрешения; токен не сохранён.')
+    return dict(token), sorted(granted)
+
+
+def safe_auth_error(exc):
+    name = type(exc).__name__
+    messages = {
+        'WSGITimeoutError': 'Не дождались завершения входа. Запусти команду снова и заверши вход в течение 5 минут.',
+        'AccessDeniedError': 'Google отклонил доступ. Проверь выбранный аккаунт, test user и ограничения организации.',
+        'MismatchingStateError': 'Ответ относится к другой попытке входа. Закрой старые окна входа и запусти команду заново.',
+        'InvalidGrantError': 'Код входа истёк или уже использован. Начни новую попытку.',
+        'RefreshError': 'Сохранённое разрешение истекло или отозвано. Повтори интерактивный вход.',
+        'SSLError': 'Не удалось проверить HTTPS-сертификат Google; проверка TLS не отключалась.',
+        'ConnectionError': 'Ошибка соединения с Google при обмене кода на токен. Повтори вход.',
+        'JSONDecodeError': 'Файл OAuth-клиента или сохранённого токена содержит некорректный JSON.'}
+    return messages.get(name, 'Вход Google не завершён (тип ошибки: ' + name + '). Содержимое ошибки скрыто, чтобы не раскрыть секреты.')
+
+
 def google_token(private_dir, service, interactive=False):
     if service not in SCOPES:
         raise AppError('Неизвестный Google-сервис.')
@@ -31,8 +80,8 @@ def google_token(private_dir, service, interactive=False):
     try:
         creds = None
         if token_path.exists():
-            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES[service])
-        if creds and not creds.has_scopes(SCOPES[service]):
+            creds = Credentials.from_authorized_user_file(str(token_path))
+        if creds and not has_required_scopes(creds, SCOPES[service]):
             creds = None
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -46,12 +95,19 @@ def google_token(private_dir, service, interactive=False):
                         client.get('token_uri') != 'https://oauth2.googleapis.com/token'):
                     raise AppError('Ожидается официальный Google OAuth JSON типа Desktop app.')
                 flow = InstalledAppFlow.from_client_secrets_file(str(client_path), SCOPES[service])
-                creds = flow.run_local_server(host='127.0.0.1', port=0, timeout_seconds=180,
-                                             authorization_prompt_message='Открывается браузер Google для входа.',
-                                             success_message='StudyRadar: вход завершён. Вернись в Terminal.')
+                try:
+                    creds = flow.run_local_server(host='127.0.0.1', port=0, timeout_seconds=300,
+                                                 prompt='consent select_account',
+                                                 authorization_prompt_message='Открывается браузер Google для входа.',
+                                                 success_message='StudyRadar: ответ Google получен. Окончательный результат смотри в Terminal.')
+                except Warning as warning:
+                    token, granted = checked_scope_token(warning, SCOPES[service])
+                    flow.oauth2session.token = token
+                    flow.oauth2session.scope = granted
+                    creds = flow.credentials
             else:
                 raise AppError('Сначала выполни google-auth --service ' + service)
-        if not creds or not creds.valid or not creds.has_scopes(SCOPES[service]):
+        if not creds or not creds.valid or not has_required_scopes(creds, SCOPES[service]):
             raise AppError('Google не предоставил необходимые разрешения.')
         tmp = token_path.with_suffix('.tmp')
         fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -62,8 +118,8 @@ def google_token(private_dir, service, interactive=False):
         return creds.token
     except AppError:
         raise
-    except Exception:
-        raise AppError('Не удалось авторизовать Google. Проверь OAuth-клиент, test user и разрешения организации; секреты скрыты.') from None
+    except Exception as exc:
+        raise AppError(safe_auth_error(exc)) from None
 
 
 def resource_id(value):
@@ -111,7 +167,43 @@ class GoogleReader:
         course_id = resource_id(course_id)
         base = 'https://classroom.googleapis.com/v1/courses/' + course_id + '/courseWork'
         works = self.pages(base, {'pageSize': 100, 'courseWorkStates': 'PUBLISHED'}, 'courseWork')
-        return [classroom_record(r, course_id) for r in works]
+        records = [classroom_record(r, course_id) for r in works]
+        if not records:
+            return records
+        try:
+            submissions = self.pages(base + '/-/studentSubmissions',
+                                     {'userId': 'me', 'pageSize': 100,
+                                      'fields': 'nextPageToken,studentSubmissions(courseId,courseWorkId,state,late)'},
+                                     'studentSubmissions')
+        except AppError:
+            for record in records:
+                record['coverage'] = 'Задание получено, но проверка сдачи недоступна или неполна.'
+            return records
+        by_work = {}
+        for submission in submissions:
+            if str(submission.get('courseId')) == course_id:
+                by_work.setdefault(str(submission.get('courseWorkId')), []).append(submission)
+        for record in records:
+            matches = by_work.get(record['id'].rsplit(':', 1)[-1], [])
+            record['submission_checked'] = True
+            record['coverage'] = 'Проверены задание и статус сдачи текущего пользователя.'
+            if len(matches) != 1:
+                record['assessment'] = {'needs_attention': None,
+                                        'text': 'Однозначная запись о сдаче не найдена; задолженность не установлена.'}
+                continue
+            submission = matches[0]
+            state = submission.get('state')
+            states = {
+                'NEW': ('not_submitted', True, 'Работа ещё не отправлена преподавателю.'),
+                'CREATED': ('not_submitted', True, 'Работа создана, но ещё не отправлена преподавателю.'),
+                'TURNED_IN': ('submitted', False, 'Работа отправлена преподавателю.'),
+                'RETURNED': ('returned', None, 'Работа возвращена преподавателем. Необходимость доработки по статусу не определяется.'),
+                'RECLAIMED_BY_STUDENT': ('not_submitted', True, 'Ты отменил отправку работы; сейчас она не сдана.')}
+            status, attention, explanation = states.get(state, ('unknown', None, 'Неизвестный статус сдачи Classroom.'))
+            record.update(status=status, submission_state=state,
+                          late=submission.get('late') if type(submission.get('late')) is bool else None,
+                          assessment={'needs_attention': attention, 'text': explanation})
+        return records
 
     def recent_mail(self, days=3, limit=20, now=None):
         if type(days) is not int or not 1 <= days <= 30 or type(limit) is not int or not 1 <= limit <= 50:

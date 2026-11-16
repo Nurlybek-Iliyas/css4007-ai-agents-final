@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 from study_radar.core import AppError, normalize
 from study_radar.storage import Store
 from study_radar.week12 import sync_courses
-from study_radar.google_sources import GoogleReader, classroom_record, resource_id, google_token
+from study_radar.google_sources import GoogleReader, classroom_record, resource_id, google_token, checked_scope_token, safe_auth_error, SCOPES, SUBMISSIONS_SCOPE, has_required_scopes
 
 
 NOW = datetime(2026, 11, 16, 12, tzinfo=timezone.utc)
@@ -117,6 +117,45 @@ class GoogleTests(unittest.TestCase):
         self.assertEqual(r['status'], 'unknown')
         self.assertFalse(r['submission_checked'])
 
+    def test_classroom_submission_states_and_user_filter(self):
+        states = [('NEW', 'not_submitted', True), ('CREATED', 'not_submitted', True),
+                  ('TURNED_IN', 'submitted', False), ('RETURNED', 'returned', None),
+                  ('RECLAIMED_BY_STUDENT', 'not_submitted', True), ('FUTURE', 'unknown', None)]
+        for state, expected, attention in states:
+            calls = []
+            def transport(url, token):
+                calls.append(url)
+                if 'studentSubmissions' in url:
+                    return {'studentSubmissions': [{'courseId': '1', 'courseWorkId': '2',
+                                                    'state': state, 'late': True}]}, {}
+                return {'courseWork': [{'id': '2', 'title': 'Test'}]}, {}
+            row = GoogleReader('synthetic', transport).coursework('1')[0]
+            self.assertEqual(row['status'], expected)
+            self.assertIs(row['assessment']['needs_attention'], attention)
+            self.assertTrue(row['submission_checked'])
+            self.assertIn('userId=me', calls[1])
+
+    def test_classroom_submission_failure_preserves_assignments(self):
+        def transport(url, token):
+            if 'studentSubmissions' in url:
+                raise AppError('private failure')
+            return {'courseWork': [{'id': '2', 'title': 'Test'}]}, {}
+        row = GoogleReader('s', transport).coursework('1')[0]
+        self.assertFalse(row['submission_checked'])
+        self.assertEqual(row['status'], 'unknown')
+        self.assertNotIn('private failure', str(row))
+
+    def test_classroom_missing_foreign_or_duplicate_submission_unknown(self):
+        for submissions in ([], [{'courseId': 'other', 'courseWorkId': '2', 'state': 'TURNED_IN'}],
+                            [{'courseId': '1', 'courseWorkId': '2', 'state': 'NEW'}] * 2):
+            def transport(url, token):
+                if 'studentSubmissions' in url:
+                    return {'studentSubmissions': submissions}, {}
+                return {'courseWork': [{'id': '2', 'title': 'Test'}]}, {}
+            row = GoogleReader('s', transport).coursework('1')[0]
+            self.assertEqual(row['status'], 'unknown')
+            self.assertIsNone(row['assessment']['needs_attention'])
+
     def test_classroom_missing_due_stays_unknown(self):
         self.assertIsNone(classroom_record({'id': '2', 'title': 'Work'}, '1')['due_at'])
 
@@ -197,6 +236,56 @@ class GoogleTests(unittest.TestCase):
     def test_unknown_google_service_rejected(self):
         with self.assertRaises(AppError):
             google_token('unused', 'calendar')
+
+    def test_oauth_existing_readonly_scopes_accepted(self):
+        warning = Warning('hidden')
+        warning.token = {'access_token': 'synthetic'}
+        warning.new_scope = SCOPES['gmail'] + SCOPES['classroom']
+        token, scopes = checked_scope_token(warning, SCOPES['classroom'])
+        self.assertTrue(set(SCOPES['classroom']).issubset(scopes))
+        self.assertEqual(token['access_token'], 'synthetic')
+
+    def test_classroom_alternative_readonly_scope_is_preserved(self):
+        warning = Warning('hidden')
+        warning.token = {'access_token': 'synthetic'}
+        warning.new_scope = [SCOPES['classroom'][0], SUBMISSIONS_SCOPE]
+        token, scopes = checked_scope_token(warning, SCOPES['classroom'])
+        self.assertIn(SUBMISSIONS_SCOPE, scopes)
+        self.assertNotIn(SCOPES['classroom'][1], scopes)
+        from types import SimpleNamespace
+        saved = SimpleNamespace(scopes=scopes, granted_scopes=None)
+        self.assertTrue(has_required_scopes(saved, SCOPES['classroom']))
+        saved.granted_scopes = SCOPES['classroom'][:1]
+        self.assertFalse(has_required_scopes(saved, SCOPES['classroom']))
+
+    def test_oauth_partial_consent_rejected(self):
+        warning = Warning('hidden')
+        warning.token = {'access_token': 'synthetic'}
+        warning.new_scope = SCOPES['classroom'][:1]
+        with self.assertRaises(AppError):
+            checked_scope_token(warning, SCOPES['classroom'])
+
+    def test_oauth_missing_scope_diagnostic_hides_token(self):
+        warning = Warning('secret-warning')
+        warning.token = {'access_token': 'secret-token'}
+        warning.new_scope = SCOPES['gmail'] + SCOPES['classroom'][:1]
+        with self.assertRaises(AppError) as caught:
+            checked_scope_token(warning, SCOPES['classroom'])
+        message = str(caught.exception)
+        self.assertIn('classroom.coursework.me.readonly', message)
+        self.assertIn('gmail.readonly', message)
+        self.assertNotIn('secret', message)
+
+    def test_oauth_unexpected_scopes_rejected(self):
+        warning = Warning('hidden')
+        warning.token = {'access_token': 'synthetic'}
+        warning.new_scope = SCOPES['classroom'] + ['https://mail.google.com/']
+        with self.assertRaises(AppError):
+            checked_scope_token(warning, SCOPES['classroom'])
+
+    def test_oauth_diagnostic_does_not_print_secrets(self):
+        self.assertNotIn('synthetic-secret', safe_auth_error(ValueError('synthetic-secret')))
+        self.assertIn('ValueError', safe_auth_error(ValueError('synthetic-secret')))
 
 
 if __name__ == '__main__':
