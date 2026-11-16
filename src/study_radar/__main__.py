@@ -1,4 +1,5 @@
 import argparse
+import sys
 import getpass
 import json
 import os
@@ -27,7 +28,10 @@ def setup():
 
 
 def main():
-    parser = argparse.ArgumentParser(description='StudyRadar — прототип недели 11')
+    from .week12 import COMMANDS, main as week12_main
+    if len(sys.argv) > 1 and sys.argv[1] in COMMANDS:
+        return week12_main(sys.argv[1:])
+    parser = argparse.ArgumentParser(description='StudyRadar — Canvas и LLM', epilog='Неделя 12: sync, tasks, changes, sources, google-auth, classroom-courses, classroom-assignments, gmail. Например: sync --help')
     parser.add_argument('command', choices=['setup', 'demo', 'courses', 'assignments', 'ask'])
     parser.add_argument('--course', type=int, action='append', default=[])
     parser.add_argument('--question', default='Какие задания требуют моего внимания?')

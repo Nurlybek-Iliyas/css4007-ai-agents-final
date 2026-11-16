@@ -1,6 +1,6 @@
 # StudyRadar — Architecture and Decisions
 
-Status: Week 10 design, not implemented. Student: Ilias Nurlybek.
+Status: original Week 10 design; see the implementation status below for current progress. Student: Ilias Nurlybek.
 
 ## Scope and decisions
 
@@ -70,3 +70,7 @@ Keep credentials, session files, private downloads and the runtime database in i
 ## AI assistance
 
 Codex assisted with requirement analysis, documentation drafting and repository preparation. These documents describe a proposal, not implemented features. The student is responsible for reviewing the design, understanding future code, verifying behavior and explaining technical decisions.
+
+## Implementation status — 16 November (Week 12)
+
+The Week 10 module table remains a proposed target, not a claim that all modules exist. Current Python code consists of the Week 11 Canvas/LLM CLI plus `storage.py` (account-scoped Canvas snapshots), `google_sources.py` (read-only OAuth and readers), and `week12.py` (commands). Canvas persistence has been checked live on one course. Google is tested with mocked responses only; authorization awaits a Desktop OAuth client. Gmail metadata is not yet interpreted as obligations, and Classroom submission states are not fetched. The model does not yet select tools autonomously. Telegram is a teacher's channel; bot/account access remains unresolved. Other planned integrations and scheduling remain future work.
