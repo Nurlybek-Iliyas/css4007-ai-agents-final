@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "now": "2026-11-09T10:00:00+05:00",
+  "assignments": [
+    {"id": 1, "name": "AI: initial prototype", "due_at": "2026-11-10T18:00:00Z", "description": "Submit a working prototype and instructions.", "submission": {"workflow_state": "unsubmitted", "missing": false}},
+    {"id": 2, "name": "Practice documents", "due_at": null, "description": "Prepare the internship agreement. Date not specified.", "submission": {"workflow_state": "unsubmitted"}},
+    {"id": 3, "name": "Project proposal", "due_at": "2026-11-08T18:59:00Z", "description": "Initial proposal.", "submission": {"workflow_state": "submitted", "submitted_at": "2026-11-07T12:00:00Z", "missing": false}}
+  ]
+}

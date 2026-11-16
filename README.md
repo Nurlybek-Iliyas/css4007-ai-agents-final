@@ -1,15 +1,24 @@
 # StudyRadar — student project
 
-**Author:** Ilias Nurlybek · **Target level:** A · **Current stage:** Week 10 planning.
+**Author:** Ilias Nurlybek · **Target level:** A · **Stage:** Week 11 prototype.
 
-A personal academic agent for finding actionable messages and obligations across Canvas, Gmail, Classroom, Telegram and Teams, with confirmed synchronization to Google Calendar. Natural-language scenarios are extensible.
+A personal academic assistant with extensible natural-language scenarios across planned Canvas, Gmail, Classroom, Telegram and Teams integrations, and approved Google Calendar updates.
 
-- [Project proposal](reports/proposal.md)
-- [Architecture and access inventory](docs/architecture.md)
+The current Python CLI implements Canvas reading and a structured OpenAI response adapter. It is not yet the full autonomous agent. Offline tests pass. The student verified live Canvas reads and an initial model response on 9 November; a status interpretation error was then fixed and regression-tested. The student repeated the corrected live workflow successfully: it selected the two not-submitted items and did not label the graded item as a debt. Other integrations are not implemented.
+
+```sh
+python3 studyradar.py demo
+python3 -m unittest discover -s tests/python -v
+```
+
+- [Week 11 setup and live-check instructions](docs/week-11-setup.md)
+- [Proposal](reports/proposal.md)
+- [Architecture](docs/architecture.md)
 - [Evaluation plan](docs/evaluation.md)
 - [Week 10 report](reports/week-10.md)
+- [Week 11 progress](reports/week-11.md)
 
-The application is not implemented yet. No live integrations or LLM calls have been verified. Existing code and tests below are instructor starter material.
+Instructor materials are preserved below; their starter tests are separate from application tests.
 
 ---
 
