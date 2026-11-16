@@ -13,3 +13,12 @@ Thumbs.db
 .private/
 *.pem
 *.key
+credentials.json
+client_secret*.json
+google-client.json
+*token.json
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+.venv-google/
